@@ -1,0 +1,162 @@
+﻿CREATE DATABASE QUANLYSV
+	ON (NAME='QUANLYSV_DATA', FILENAME='C:\SQL\QUANLYSV.MDF')
+	LOG ON (NAME='QUANLYSV_LOG', FILENAME='C:\SQL\QUANLYSV.LDF')
+USE QUANLYSV
+--1// BẢNG KHOA
+CREATE TABLE KHOA
+(
+	MAKHOA VARCHAR(4) PRIMARY KEY,
+	TENKHOA NVARCHAR(30),
+	NAMTHANHLAP INT
+)
+--2// BẢNG SINH VIÊN
+CREATE TABLE SVIEN
+(
+	MASV INT PRIMARY KEY,
+	TEN NVARCHAR(30),
+	NAM INT,
+	MAKH VARCHAR(4),
+	FOREIGN KEY (MAKH) REFERENCES KHOA(MAKHOA),
+)
+--3// BẢNG MÔN HỌC
+CREATE TABLE MHOC
+(
+	MAMH VARCHAR(8) PRIMARY KEY,
+	TENMH NVARCHAR(30), 
+	TINCHI INT,
+	MAKH VARCHAR(4),
+	FOREIGN KEY (MAKH) REFERENCES KHOA(MAKHOA)
+)
+--4// BẢNG ĐIỀU KIỆN
+CREATE TABLE DKIEN
+(
+	MAMH VARCHAR(8),
+	MAMH_TRUOC VARCHAR(8),
+	PRIMARY KEY (MAMH, MAMH_TRUOC),
+	FOREIGN KEY (MAMH) REFERENCES MHOC(MAMH),
+	FOREIGN KEY (MAMH_TRUOC) REFERENCES MHOC(MAMH)
+)	 
+--5// BẢNG HỌC PHẦN 
+CREATE TABLE HPHAN
+(
+	MAHP INT PRIMARY KEY,
+	MAMH VARCHAR(8),
+	FOREIGN KEY (MAMH) REFERENCES MHOC(MAMH),
+	HOCKY INT,
+	NAM INT,
+	GV NVARCHAR(30)
+)
+--6// BẢNG KẾT QUẢ
+CREATE TABLE KQUA
+(
+	MASV INT,
+	MAHP INT,
+	PRIMARY KEY(MASV, MAHP),
+	FOREIGN KEY (MASV) REFERENCES SVIEN(MASV),
+	FOREIGN KEY (MAHP) REFERENCES HPHAN(MAHP),
+	DIEM DECIMAL(3,1)
+)	 
+--7// THỰC HIỆN TRUY VẤN 
+ 
+--1.	Tạo các quan hệ trên (bao gồm các ràng buộc khóa chính, ràng buộc tham chiếu) 
+
+
+--2.	Thêm vào SVIEN bộ <25, ’Nam’, 2, ‘CNTT’>
+INSERT INTO SVIEN VALUES (25, 'Nam', 2, 'CNTT')
+
+--3.	Thêm vào KQUA 2 bộ <25,102,7>, <25,135,9>
+INSERT INTO KQUA VALUES (25,102,7)
+INSERT INTO KQUA VALUES (25,135,9)
+
+--4.	Sửa bộ <8,102,8> thành <8,102,9>
+UPDATE KQUA
+SET DIEM=9
+WHERE MASV=8 AND MAHP=102
+
+--5.	Xóa bộ <8,135,10>
+DELETE
+FROM KQUA
+WHERE MASV=8 AND MAHP=135
+
+--6.	Tạo các câu truy vấn sau:
+--a.	Tên các sinh viên thuộc Khoa ‘Công Nghệ Thông tin’.
+SELECT TEN, TENKHOA
+FROM SVIEN S, KHOA K
+WHERE S.MAKH=K.MAKHOA AND TENKHOA=N'Công Nghệ Thông tin'
+
+--b.	Kết quả học tập của sinh viên có mã số 8.
+SELECT K.MASV, TEN, DIEM
+FROM KQUA K, SVIEN S
+WHERE K.MASV=S.MASV AND S.MASV=8
+
+--c.	Tên sinh viên và mã môn học mà sinh viên đó đăng ký học với kết quả cuối khóa trên 7 điểm.
+SELECT TEN, MAMH, DIEM
+FROM SVIEN S, KQUA K, HPHAN H
+WHERE S.MASV=K.MASV AND K.MAHP=H.MAHP AND DIEM > 7
+
+--d.	Tên các môn học có số tín chỉ nhỏ nhất.
+SELECT TOP 1 WITH TIES MAMH, TENMH, TINCHI
+FROM MHOC
+ORDER BY TINCHI ASC
+
+--e.	Tên các sinh viên thuộc về Khoa có phụ trách môn học ‘Toán rời rạc’.
+SELECT TEN, TENKHOA, TENMH
+FROM SVIEN S, KHOA K ,MHOC M
+WHERE S.MAKH=K.MAKHOA AND K.MAKHOA=M.MAKH AND TENMH= N'Toán rời rạc'
+
+--f.	Tên các môn học phải học ngay trước môn ‘Cơ sở dữ liệu’.
+SELECT TENMH,MAMH
+FROM MHOC
+WHERE MAMH IN
+(
+	SELECT MAMH_TRUOC
+	FROM MHOC,DKIEN
+	WHERE MHOC.MAMH=DKIEN.MAMH AND TENMH=N'Cơ sở dữ liệu'
+
+)
+
+--g.	Tên các môn học phải học ngay sau môn ‘Cơ sở dữ liệu’.
+SELECT MAMH,TENMH
+FROM MHOC
+WHERE MAMH IN
+(
+	SELECT MAMH_TRUOC
+	FROM MHOC,DKIEN
+	WHERE MHOC.MAMH=DKIEN.MAMH_TRUOC AND TENMH=N'Cơ sở dữ liệu'
+)
+
+--h.	In ra tổng số môn học mà Khoa Công Nghệ Thông tin đang phụ trách.
+SELECT COUNT(*) AS [TỔNG SỐ MÔN]
+FROM MHOC
+WHERE MAKH= N'CNTT'
+
+--i.	Mã học phần và số lượng sinh viên đăng ký theo từng học phần.
+SELECT  MAHP, COUNT(*) AS [SỐ LƯỢNG SV DK]
+FROM KQUA
+GROUP BY MAHP
+
+--j.	In ra tên các học phần có từ 2 SV đăng ký trở lên.
+SELECT  MAHP, COUNT(*) AS [SỐ LƯỢNG SV DK]
+FROM KQUA
+GROUP BY MAHP
+HAVING COUNT(*) >=2
+
+--k.	Tên sinh viên và điểm trung bình của sinh viên đó trong từng học kỳ của từng năn học.
+SELECT TEN, AVG(DIEM) AS DTB, HOCKY, H.NAM 
+FROM SVIEN S, KQUA K, HPHAN H
+WHERE S.MASV=K.MASV AND K.MAHP=H.MAHP 
+GROUP BY TEN, HOCKY, H.NAM
+
+
+--l.	Tên sinh viên đạt điểm cao nhất trong từng học kỳ, năm học.
+SELECT TOP 1 WITH TIES TEN, DIEM, HOCKY, H.NAM
+FROM SVIEN S, KQUA K, HPHAN H
+WHERE S.MASV=K.MASV AND K.MAHP=H.MAHP
+ORDER BY DIEM DESC
+
+--m.	Tên sinh viên chưa đăng ký học môn ‘Toán rời rạc’.
+SELECT TEN
+FROM SVIEN S, KHOA K
+WHERE S.MAKH=K.MAKHOA AND K.MAKHOA NOT IN (SELECT M.MAKH
+											FROM MHOC M
+											WHERE TENMH=N'Toán rời rạc')
